@@ -1,0 +1,65 @@
+Sub UpdateDeliveryDates()
+
+    Dim sapApp As Object
+    Dim SapGuiAuto As Object
+    Dim sapConn As Object
+    Dim session As Object
+
+    Dim wb As Workbook
+    Dim ws As Worksheet
+    Dim deliveryNumber As String
+    Dim deliveryDate As String
+    Dim i As Long
+
+    On Error GoTo ErrorHandler
+
+    ' Connect to SAP GUI
+    Set SapGuiAuto = GetObject("SAPGUI")
+    Set sapApp = SapGuiAuto.GetScriptingEngine
+    Set sapConn = sapApp.Children(0)
+    Set session = sapConn.Children(0)
+
+    ' Set workbook and worksheet (change sheet name if needed)
+    Set wb = ThisWorkbook
+    Set ws = wb.Sheets("Deliveries") ' Change if your sheet has a different name
+
+    i = 2 ' Assuming row 1 contains headers
+
+    ' Loop through each row until column A is empty
+    Do While ws.Cells(i, 1).Value <> ""
+
+        deliveryNumber = ws.Cells(i, 1).Value
+        deliveryDate = Format(ws.Cells(i, 2).Value, "dd.mm.yyyy")
+
+        ' Go to VL02N and update the date
+        session.StartTransaction "VL02N"
+        session.findById("wnd[0]/usr/ctxtLIKP-VBELN").Text = deliveryNumber
+        session.findById("wnd[0]").sendVKey 0 ' Simulate pressing ENTER
+        session.findById("wnd[0]").sendVKey 8 ' Press F8 to open Header details
+
+        ' Go to the "Processing" tab
+        session.findById("wnd[0]/usr/tabsTAXI_TABSTRIP_HEAD/tabpT\01").Select
+
+        ' Update the delivery dates using correct field IDs
+        session.findById("wnd[0]/usr/tabsTAXI_TABSTRIP_HEAD/tabpT\01/ssubSUBSCREEN_BODY:SAPMV50A:2102/ctxtLIKP-KODAT").Text = deliveryDate ' Picking Date
+        session.findById("wnd[0]/usr/tabsTAXI_TABSTRIP_HEAD/tabpT\01/ssubSUBSCREEN_BODY:SAPMV50A:2102/ctxtLIKP-TDDAT").Text = deliveryDate ' Trans. Planning Date
+        session.findById("wnd[0]/usr/tabsTAXI_TABSTRIP_HEAD/tabpT\01/ssubSUBSCREEN_BODY:SAPMV50A:2102/ctxtLIKP-LDDAT").Text = deliveryDate ' Loading Date
+        session.findById("wnd[0]/usr/tabsTAXI_TABSTRIP_HEAD/tabpT\01/ssubSUBSCREEN_BODY:SAPMV50A:2102/ctxtLIKP-WADAT").Text = deliveryDate ' Planned GI Date
+        session.findById("wnd[0]/usr/tabsTAXI_TABSTRIP_HEAD/tabpT\01/ssubSUBSCREEN_BODY:SAPMV50A:2102/ctxtLIKP-LFDAT").Text = deliveryDate ' Delivery Date
+
+        ' Save the changes
+        session.findById("wnd[0]/tbar[0]/btn[11]").press
+
+        ' Mark the Excel row as "Updated"
+        ws.Cells(i, 3).Value = "Updated"
+
+        i = i + 1
+    Loop
+
+    MsgBox "✔ Finished."
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "❌ Error: " & Err.Description
+
+End Sub
